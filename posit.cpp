@@ -98,13 +98,17 @@ void rectBlob(IplImage * img, CBlob blob, CvScalar color){
 }
 
 int main(int argc, char * argv[]){
-
-    if (argc != 2) {
-		printf("usage: %s vid.avi\n", argv[0]);
-		abort();
+    CvCapture*  vid;
+    if (argc == 1) {
+	vid = cvCreateCameraCapture(0);
+    }else if(argc == 2){
+	vid = cvCreateFileCapture(argv[1]);
+    }else{
+	printf("usage: %s vid.avi\n", argv[0]);
+	abort();
     }
 	
-    CvCapture*  vid = cvCreateFileCapture(argv[1]);
+
 	
     if( !vid )
     {
@@ -127,7 +131,7 @@ int main(int argc, char * argv[]){
 		       cvPoint3D32f( 0.2858,-0.080,-0.125 ),\
 		       cvPoint3D32f( 0.0,0.0,0.0 )};
     CvPOSITObject * posObj = cvCreatePOSITObject(objectPoints,NUM_LEDS);
-    double focal_length = 534;
+    double focal_length = 875;
     
     CvMatr32f rotation_matrix = new float[9];
     CvVect32f translation_vector = new float[3];
