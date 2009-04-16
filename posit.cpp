@@ -21,9 +21,9 @@ using namespace std;
 #define NUM_LEDS 4
 
 #define BLU CV_RGB(0,0,255)
-#define RED CV_RGB(255,0,0)
-#define GRN CV_RGB(0,255,0)
-#define ORN CV_RGB(143,89,26)
+#define RED CV_RGB(207,48,143)
+#define GRN CV_RGB(0,255,64)
+#define ORN CV_RGB(255,255,255)
 /*
 #define R_BLU CV_RGB(0,0,1)
 #define R_RED CV_RGB(1,0,0)
@@ -187,7 +187,7 @@ void idle(void)
 		}
 		
 		
-		cvPOSIT(posObj,imgPoints,focal_length,cvTermCriteria(1,10,.05),
+		cvPOSIT(posObj,imgPoints,focal_length,cvTermCriteria(CV_TERMCRIT_ITER, 5, 1.0e-5 ),
 				rotation_matrix,translation_vector);
 		cout << "rotation_matrix" << endl;
 		for(int i=0;i<3;i++){
@@ -205,6 +205,8 @@ void idle(void)
 	cvShowImage(THR, thresholded);
 	cvShowImage(DEV, videoFrame);
 	int k = cvWaitKey(0);
+	if (k == ESC)
+		exit(0);
 	videoFrame = cvQueryFrame(vid);
 	glutPostRedisplay();
 }
@@ -276,8 +278,10 @@ void display(void)
 	//	}
 	
 	//else{
-	glTranslatef(0.0, 0.0 , -8.42);
+	glTranslatef(0.0, 0.0 , -20);
 	//}
+	
+	
 	
 	
 	
@@ -287,8 +291,29 @@ void display(void)
 	//	glPushMatrix();
 	//	glLightfv(GL_LIGHT1, GL_POSITION, light1Pos);
 	//	glPopMatrix();
-	
+
 	glScalef(8.0, 8.0, 8.0);
+	glRotatef(180, 0, 1, 0);
+	
+	GLfloat transform[16];
+	transform[0] = rotation_matrix[0];
+	transform[1] = rotation_matrix[3];
+	transform[2] = rotation_matrix[6];
+	transform[3] = 0;
+	transform[4] = rotation_matrix[1];
+	transform[5] = rotation_matrix[4];
+	transform[6] = rotation_matrix[7];
+	transform[7] = 0;
+	transform[8] = rotation_matrix[2];
+	transform[9] = rotation_matrix[5];
+	transform[10] = rotation_matrix[8];
+	transform[11] = 0;
+	transform[12] = translation_vector[0];
+	transform[13] = translation_vector[1];
+	transform[14] = translation_vector[2];
+	transform[15] = 1;
+	
+	glMultMatrixf(transform);
 	
 	const GLfloat			lightAmbient[] = {0.2, 0.2, 0.2, 1.0};
 	const GLfloat			lightDiffuse[] = {1.0, 1.0, 1.0, 1.0};
