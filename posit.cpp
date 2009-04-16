@@ -221,7 +221,7 @@ void idle(void)
 	//	cvShowImage(DEV, videoFrame);
 	int k = cvWaitKey(0);
 	if(k == 'q' || k == ESC)
-	  abort();
+	  exit(0);
 	videoFrame = cvQueryFrame(vid);
 	glutPostRedisplay();
 }
@@ -306,6 +306,31 @@ void display(void)
 	//	glPopMatrix();
 	
 	glScalef(8.0, 8.0, 8.0);
+	glRotatef(180, 0.0, 1.0, 0.0);
+	
+	GLfloat transform[16];
+	transform[0] = rotation_matrix[0];
+	transform[1] = rotation_matrix[3];
+	transform[2] = rotation_matrix[6];
+	transform[3] = 0;
+	transform[4] = rotation_matrix[1];
+	transform[5] = rotation_matrix[4];
+	transform[6] = rotation_matrix[7];
+	transform[7] = 0;
+	transform[8] = rotation_matrix[2];
+	transform[9] = rotation_matrix[5];
+	transform[10] = rotation_matrix[8];
+	transform[11] = 0;
+	transform[12] = translation_vector[0];
+	transform[13] = translation_vector[1];
+	transform[14] = translation_vector[2];
+	transform[15] = 1;
+	
+	glMultMatrixf(transform);
+
+
+
+
 	
 	const GLfloat			lightAmbient[] = {0.2, 0.2, 0.2, 1.0};
 	const GLfloat			lightDiffuse[] = {1.0, 1.0, 1.0, 1.0};
