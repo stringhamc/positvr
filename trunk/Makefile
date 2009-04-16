@@ -1,8 +1,8 @@
 #CFLAGS = -g
-EXES = posit.exe calibration.exe
-CFLAGS = -g -I/usr/local/include/opencv -I.
-LDFLAGS = -L/usr/local/lib -lcxcore -lcv -lhighgui -lcvaux -lml -L. -lblob
-LIBS =  -L. -lblob -L/usr/local/lib -lcxcore -lcv -lhighgui -lcvaux -lml -I/usr/local/include/opencv 
+EXES = posit calibration
+CFLAGS = `pkg-config opencv --cflags`
+LDFLAGS = -lblob 
+LIBS =  `pkg-config opencv --libs` -framework GLUT -framework OpenGL -framework Cocoa
 CXX=g++
 
 CPPFILES= \
@@ -38,11 +38,11 @@ libblob.a: $(CPPFILES:.cpp=.o)
 
 
 
-posit.exe: posit.cpp libblob.a
+posit: posit.cpp libblob.a
 	g++ -o $@ $? $(CFLAGS) $(LIBS)
 
-run: posit.exe
-	./posit.exe tryAgain.avi
+run: posit
+	./posit tryAgain.avi
 
-calibration.exe: calibration.cpp
+calibration: calibration.cpp
 	g++ -o $@ $? $(CFLAGS) $(LIBS)
