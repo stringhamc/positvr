@@ -54,9 +54,9 @@ IplImage * thresholded;
 IplImage * greythresh;
 int t;
 IplConvKernel * element;
-CvPoint3D32f objectPoints[NUM_LEDS] = {cvPoint3D32f( -0.2891,-0.08,-0.125 ),\
-cvPoint3D32f( 0.0,-0.103,0.0 ),\
-cvPoint3D32f( 0.2858,-0.080,-0.125 ),\
+CvPoint3D32f objectPoints[NUM_LEDS] = {cvPoint3D32f( 0.2891,0.08,0.125 ),\
+cvPoint3D32f( 0.0,0.103,0.0 ),\
+cvPoint3D32f( -0.2858,0.080,0.125 ),\
 cvPoint3D32f( 0.0,0.0,0.0 )};
 
 CvPOSITObject * posObj;
@@ -82,14 +82,14 @@ CvScalar sumBlob(IplImage * img, CBlob blob){
 		}
     }
 	
-    double scale = result.val[1]+result.val[0]+result.val[2];
+    /*    double scale = result.val[1]+result.val[0]+result.val[2];
     result.val[0] = result.val[0]/scale;
     result.val[1] = result.val[1]/scale;
-    result.val[2] = result.val[2]/scale;
+    result.val[2] = result.val[2]/scale;*/
     /*    for(int i = 0;i<3; i++)
 	 cout << result.val[i] << " " ;
 	 cout << endl;*/
-    return result;
+    return normRGB(result);
 }
 
 double colorDist(CvScalar c1, CvScalar ratio){
@@ -101,7 +101,7 @@ double colorDist(CvScalar c1, CvScalar ratio){
 		result += t*t;
     }
     result = sqrt(result);	
-    cout << result << "r ";
+    //    cout << result << "r ";
     return result;
 }
 
@@ -111,27 +111,29 @@ double colorDist(CvScalar c1, CvScalar ratio){
 double optimalLEDMatch(CvScalar colors[NUM_LEDS], CvScalar leds[NUM_LEDS], 
 		       int match_index[NUM_LEDS])
 {
+  double test[NUM_LEDS][NUM_LEDS];//leds X colors
+  for(int i = 0; i < NUM_LEDS; i++)
+    for(int j = 0; j < NUM_LEDS; j++)
+      test[i][j] = colorDist(leds[i],colors[j]);
   double result = 50000.0;
+  //  double test[4];
   
   for(int i = 0; i< NUM_LEDS; i++){
-    double test = colorDist(leds[i],colors[0]);
-    if(test > result)
+    if(test[i][0] > result)
       continue;
     for(int j = 0; j < NUM_LEDS; j++){
       if(j == i) continue;
-      test += colorDist(leds[j],colors[1]);
-      if(test > result)
+      if(test[i][0]+test[j][1] > result)
 	continue;
       for(int k = 0; k < NUM_LEDS; k++){
 	if(k == j || k == i) continue;
-	test += colorDist(leds[k],colors[2]);
-	if(test > result)
+	if(test[i][0]+test[j][1]+test[k][2] > result)
 	  continue;
 	for(int m = 0; m < NUM_LEDS; m++){
 	  if(m == j || m == k || m == i) continue;
-	  test += colorDist(leds[m],colors[3]);
-	  if(test < result){
-	    result = test;
+	  double r;
+	  if((r = test[i][0]+test[j][1]+test[k][2]+test[m][3]) < result){
+	    result = r;
 	    match_index[0] = i;
 	    match_index[1] = j;
 	    match_index[2] = k;
@@ -219,7 +221,7 @@ void idle(void)
 	}
 	cvShowImage(THR, thresholded);
 	//	cvShowImage(DEV, videoFrame);
-	int k = cvWaitKey(0);
+	int k = cvWaitKey(WAIT);
 	if(k == 'q' || k == ESC)
 	  exit(0);
 	videoFrame = cvQueryFrame(vid);
@@ -425,7 +427,7 @@ int main(int argc, char * argv[]){
 	
 	
     videoFrame = NULL;
-    cvNamedWindow(DEV, 1);
+    //    cvNamedWindow(DEV, 1);
     cvNamedWindow(THR, 1);
     videoFrame = cvQueryFrame(vid);
     thresholded = (IplImage*)cvClone(videoFrame);
