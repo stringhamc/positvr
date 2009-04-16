@@ -127,7 +127,7 @@ int main(int argc, char * argv[]){
 		       cvPoint3D32f( 0.2858,-0.080,-0.125 ),\
 		       cvPoint3D32f( 0.0,0.0,0.0 )};
     CvPOSITObject * posObj = cvCreatePOSITObject(objectPoints,NUM_LEDS);
-    double focal_length = 0.003;
+    double focal_length = 534;
     
     CvMatr32f rotation_matrix = new float[9];
     CvVect32f translation_vector = new float[3];
