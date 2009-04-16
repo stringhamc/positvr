@@ -9,6 +9,9 @@
 #include <iostream>
 #include "BlobResult.h"
 #include <math.h>
+#include <GLUT/glut.h>
+#include "skull.h"
+
 //#include "Blob.h"
 using namespace std;
 #define ESC 27
@@ -41,22 +44,26 @@ CvScalar R_RED = normRGB(RED);
 CvScalar R_ORN = normRGB(ORN);
 CvScalar R_GRN = normRGB(GRN);
 
-void printMat(CvMat * mat){
-    cout << "[";
-    for(int i = 0;i < mat->rows; i++){
-		if(i) cout << " ";
-		for(int j = 0; j< mat->cols;j++){
-			cout << *cvGet2D(mat,i,j).val << " ";
-		}
-		if(i!=mat->rows-1)cout << endl;
-    }
-    cout << "]" << endl;
-}
 
-void printBlobLoc(const char * name, CBlob blob){
-    cout << name << " " << blob.minx << "," <<	blob.miny << " to " <<
-	blob.MaxX() << "," <<	blob.MaxY() << " ";
-}
+CvCapture*  vid;
+IplImage * videoFrame;
+
+
+
+IplImage * thresholded;
+IplImage * greythresh;
+int t;
+IplConvKernel * element;
+CvPoint3D32f objectPoints[NUM_LEDS] = {cvPoint3D32f( -0.2891,-0.08,-0.125 ),\
+cvPoint3D32f( 0.0,-0.103,0.0 ),\
+cvPoint3D32f( 0.2858,-0.080,-0.125 ),\
+cvPoint3D32f( 0.0,0.0,0.0 )};
+
+CvPOSITObject * posObj;
+double focal_length;
+
+CvMatr32f rotation_matrix;
+CvVect32f translation_vector;
 
 CvScalar sumBlob(IplImage * img, CBlob blob){
 	//unsigned int a ing->imageData    y*img->widthStep+x
@@ -84,15 +91,14 @@ CvScalar sumBlob(IplImage * img, CBlob blob){
 	 cout << endl;*/
     return result;
 }
-double myabs(double v){ return (v<0.0)?-1*v:v;}
 
 double colorDist(CvScalar c1, CvScalar ratio){
     CvScalar norm = normRGB(c1);
     double result = 0.0;
-//    double sumc1 = c1.val[0] + c1.val[1] + c1.val[2];
+	//    double sumc1 = c1.val[0] + c1.val[1] + c1.val[2];
     for(int i = 0; i < 3; i++){
-	double t = ((norm.val[i]) - ratio.val[i]);
-	result += t*t;
+		double t = ((norm.val[i]) - ratio.val[i]);
+		result += t*t;
     }
     return sqrt(result);	
 }
@@ -113,8 +119,251 @@ void rectBlob(IplImage * img, CBlob blob, CvScalar color){
 				cvPoint((int)blob.MaxX(), (int)blob.MaxY()), brightc);
 }
 
+
+void idle(void)
+{
+	cvThreshold( videoFrame, thresholded, 250, 1, CV_THRESH_TOZERO );
+	cvDilate(thresholded,thresholded,element);
+	cvSmooth(thresholded,thresholded);
+	cvCvtColor(thresholded, greythresh, CV_BGR2GRAY);
+	CBlobResult blobs;
+	// Extract the blobs using a threshold of 100 in the image
+	blobs = CBlobResult( greythresh, NULL, 10, true );
+	// object with the blob with most perimeter in the image
+	// (the criteria to select can be any class derived from COperadorBlob)
+	// from the filtered blobs, get the blob with biggest perimeter
+	blobs.Filter( blobs, B_INCLUDE, CBlobGetPerimeter(), B_LESS, 1000 );
+	blobs.Filter( blobs, B_INCLUDE, CBlobGetPerimeter(), B_GREATER, 15 );
+	// get the blob with less area
+	CBlob blob[4];
+	int color_index[4]; //blue green red orange
+	for(int i = 0; i<4;i++)
+		color_index[i]= 0;
+	double bluMin= 1.0, ornMin= 1.0, grnMin= 1.0;
+	if(blobs.GetNumBlobs() > 3){
+		for(int i  = 0; i< 4; i++){
+			blobs.GetNthBlob( CBlobGetArea(), i, blob[i] );
+			double t;
+			if((t=colorDist(sumBlob(thresholded,blob[i]),R_GRN))<grnMin){
+				color_index[1] = i;
+				grnMin = t;
+			}
+			if((t=colorDist(sumBlob(thresholded,blob[i]),R_BLU))<bluMin){
+				color_index[0] = i;
+				bluMin = t;
+			}
+		}
+		if(color_index[0] == color_index[1])//blue and green match blobs
+		{
+			//continue;//tryagain
+			cvWaitKey(0);
+			videoFrame = cvQueryFrame(vid);
+			glutPostRedisplay();
+			return;
+		}
+		int left[2];
+		int k = 0;
+		for(int i= 0; i< 4; i++)
+			if((color_index[0] != i) && (color_index[1] != i))
+				left[k++] = i;
+		
+		if(colorDist(sumBlob(thresholded,blob[left[0]]),R_ORN)<colorDist(sumBlob(thresholded,blob[left[1]]),R_ORN)){
+			color_index[3] = left[0];
+			color_index[2] = left[1];
+		}else{
+			color_index[3] = left[1];
+			color_index[2] = left[0];
+		}
+		CvScalar colors[4] = {BLU,GRN,RED,ORN};
+		for(int i = 0; i < 4; i++){
+			rectBlob(thresholded,blob[color_index[i]],colors[i]);
+		}
+		
+		
+		CvPoint2D32f imgPoints[NUM_LEDS];
+		for(int i = 0; i < NUM_LEDS; i++){
+			imgPoints[i] = cvPoint2D32f(blob[color_index[i]].sumx,blob[color_index[i]].sumy);
+			cout << "imgPoint " << i << ": " << imgPoints[i].x << ", " << imgPoints[i].y << endl;
+		}
+		
+		
+		cvPOSIT(posObj,imgPoints,focal_length,cvTermCriteria(1,10,.05),
+				rotation_matrix,translation_vector);
+		cout << "rotation_matrix" << endl;
+		for(int i=0;i<3;i++){
+			for(int j=0;j<3;j++){
+				cout << rotation_matrix[i*3+j] << "\t";
+			}
+			cout << endl;
+		}
+		cout <<  "translation_vector" << endl;
+		for(int j=0;j<3;j++){
+			cout << translation_vector[j] << endl;
+		}
+		
+	}
+	cvShowImage(THR, thresholded);
+	cvShowImage(DEV, videoFrame);
+	int k = cvWaitKey(0);
+	videoFrame = cvQueryFrame(vid);
+	glutPostRedisplay();
+}
+
+void
+visible(int state)
+{
+	if (state == GLUT_VISIBLE) {
+		glutIdleFunc(idle);
+	} else {
+		glutIdleFunc(NULL);
+	}
+}
+
+
+void display(void)
+{
+	unsigned int i;
+	glMatrixMode(GL_PROJECTION);
+	//glLoadIdentity();
+	GLfloat projection[16];
+	static GLfloat xp = .1;
+	static GLfloat yp = .1;
+	static GLfloat zp = -.07;
+	zp -= 0;
+	
+	//yp += .1;
+	//xp += .1;
+	projection[0] = 50;
+	projection[1] = 0;
+	projection[2] = 0;
+	projection[3] = 0;
+	
+	projection[4] = 0;
+	projection[5] = 50;
+	projection[6] = 0;
+	projection[7] = 0;
+	
+	projection[8] = 0;
+	projection[9] = 0;
+	projection[10] = 1;
+	projection[11] = 0;
+	
+	projection[12] = 0;
+	projection[13] = 0;
+	projection[14] = 0;
+	projection[15] = 1;
+	
+	//glMultMatrixf(projection);
+	
+	glMatrixMode(GL_MODELVIEW);
+	
+	
+	glPushMatrix(); /* Make sure the matrix stack is cleared at the end of this function. */
+	
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	glLoadIdentity();
+	
+	/*@@@@@@ Rotation and Translation of Entire Scene @@@@@*/
+	//
+	//	if(mvt_x < 0 && mvt_y < 0){
+	//		glTranslatef(mvt_x ,mvt_y ,mvt_z );
+	//		mvt_x = mvt_x - Tx;
+	//		mvt_y = mvt_y - Ty;
+	//		mvt_z = mvt_z - Tz;
+	//		
+	//		glRotatef(mvr_d, mvr_x, mvr_y, mvr_z);
+	//		mvr_d = mvr_d - Rx;
+	//	}
+	
+	//else{
+	glTranslatef(0.0, 0.0 , -8.42);
+	//}
+	
+	
+	
+	
+	/*@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@*/
+	
+	//	glPushMatrix();
+	//	glLightfv(GL_LIGHT1, GL_POSITION, light1Pos);
+	//	glPopMatrix();
+	
+	glScalef(8.0, 8.0, 8.0);
+	
+	const GLfloat			lightAmbient[] = {0.2, 0.2, 0.2, 1.0};
+	const GLfloat			lightDiffuse[] = {1.0, 1.0, 1.0, 1.0};
+	const GLfloat			matAmbient[] = {0.6, 0.6, 0.6, 1.0};
+	const GLfloat			matDiffuse[] = {1.0, 1.0, 1.0, 1.0};	
+	const GLfloat			matSpecular[] = {1.0, 1.0, 1.0, 1.0};
+	const GLfloat			lightPosition[] = {0.0, 0.0, 1.0, 0.0}; 
+	const GLfloat			lightShininess = 100.0;
+	glEnable(GL_LIGHTING);
+	glEnable(GL_LIGHT0);
+	glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, matAmbient);
+	glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, matDiffuse);
+	glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, matSpecular);
+	glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, lightShininess);
+	glLightfv(GL_LIGHT0, GL_AMBIENT, lightAmbient);
+	glLightfv(GL_LIGHT0, GL_DIFFUSE, lightDiffuse);
+	glLightfv(GL_LIGHT0, GL_POSITION, lightPosition); 			
+	glShadeModel(GL_SMOOTH);
+	
+	
+	glVertexPointer(3, GL_FLOAT, 0, skullVertices);
+	glNormalPointer(GL_FLOAT, 0, skullNormals);
+	glEnableClientState(GL_VERTEX_ARRAY);
+	glEnableClientState(GL_NORMAL_ARRAY);
+	glEnable(GL_COLOR_MATERIAL);
+	glColor4f(1, 1, 1, 1);
+	for (i = 0; i < skullIndexCount/3; i++) {
+		glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_SHORT, &skullIndices[i * 3]);
+	}
+	glDisableClientState(GL_VERTEX_ARRAY);
+	glDisableClientState(GL_NORMAL_ARRAY);
+	
+	glutSwapBuffers();
+	
+
+	
+	glPopMatrix(); /* Clear the matrix stack */
+	
+}
+
+void
+keyboard(unsigned char ch, int x, int y)
+{
+	switch (ch) {
+		case 27:             /* escape */
+			exit(0);
+			break;
+	}
+}
+
+
+
+void printMat(CvMat * mat){
+    cout << "[";
+    for(int i = 0;i < mat->rows; i++){
+		if(i) cout << " ";
+		for(int j = 0; j< mat->cols;j++){
+			cout << *cvGet2D(mat,i,j).val << " ";
+		}
+		if(i!=mat->rows-1)cout << endl;
+    }
+    cout << "]" << endl;
+}
+
+void printBlobLoc(const char * name, CBlob blob){
+    cout << name << " " << blob.minx << "," <<	blob.miny << " to " <<
+	blob.MaxX() << "," <<	blob.MaxY() << " ";
+}
+
+double myabs(double v){ return (v<0.0)?-1*v:v;}
+
+
 int main(int argc, char * argv[]){
-    CvCapture*  vid;
+	
+	
     if (argc == 1) {
 		vid = cvCreateCameraCapture(0);
     }else if(argc == 2){
@@ -133,110 +382,55 @@ int main(int argc, char * argv[]){
     }
 	
 	
-    IplImage * videoFrame = NULL;
+    videoFrame = NULL;
     cvNamedWindow(DEV, 1);
     cvNamedWindow(THR, 1);
     videoFrame = cvQueryFrame(vid);
-    IplImage * thresholded = (IplImage*)cvClone(videoFrame);
-    IplImage * greythresh = cvCreateImage(cvSize(videoFrame->width,videoFrame->height),IPL_DEPTH_8U, 1);
-    int t = 0;
+    thresholded = (IplImage*)cvClone(videoFrame);
+    greythresh = cvCreateImage(cvSize(videoFrame->width,videoFrame->height),IPL_DEPTH_8U, 1);
+    t = 0;
     // object that will contain blobs of thresholded
-    IplConvKernel * element = cvCreateStructuringElementEx(5, 5, 2, 2, CV_SHAPE_ELLIPSE);
-    CvPoint3D32f objectPoints[NUM_LEDS] = {cvPoint3D32f( -0.2891,-0.08,-0.125 ),\
-		cvPoint3D32f( 0.0,-0.103,0.0 ),\
-		cvPoint3D32f( 0.2858,-0.080,-0.125 ),\
-	cvPoint3D32f( 0.0,0.0,0.0 )};
-    CvPOSITObject * posObj = cvCreatePOSITObject(objectPoints,NUM_LEDS);
-    double focal_length = 875;
+    element = cvCreateStructuringElementEx(5, 5, 2, 2, CV_SHAPE_ELLIPSE);
+    //CvPoint3D32f objectPoints[NUM_LEDS] = {cvPoint3D32f( -0.2891,-0.08,-0.125 ),\
+//		cvPoint3D32f( 0.0,-0.103,0.0 ),\
+//		cvPoint3D32f( 0.2858,-0.080,-0.125 ),\
+//	cvPoint3D32f( 0.0,0.0,0.0 )};
+    posObj = cvCreatePOSITObject(objectPoints,NUM_LEDS);
+    focal_length = 875;
     
-    CvMatr32f rotation_matrix = new float[9];
-    CvVect32f translation_vector = new float[3];
+    rotation_matrix = new float[9];
+    translation_vector = new float[3];
 	
 	
-    do{
-		cvThreshold( videoFrame, thresholded, 250, 1, CV_THRESH_TOZERO );
-		cvDilate(thresholded,thresholded,element);
-		cvSmooth(thresholded,thresholded);
-		cvCvtColor(thresholded, greythresh, CV_BGR2GRAY);
-		CBlobResult blobs;
-		// Extract the blobs using a threshold of 100 in the image
-		blobs = CBlobResult( greythresh, NULL, 10, true );
-		// object with the blob with most perimeter in the image
-		// (the criteria to select can be any class derived from COperadorBlob)
-		// from the filtered blobs, get the blob with biggest perimeter
-		blobs.Filter( blobs, B_INCLUDE, CBlobGetPerimeter(), B_LESS, 1000 );
-		blobs.Filter( blobs, B_INCLUDE, CBlobGetPerimeter(), B_GREATER, 15 );
-		// get the blob with less area
-		CBlob blob[4];
-		int color_index[4]; //blue green red orange
-		for(int i = 0; i<4;i++)
-			color_index[i]= 0;
-		double bluMin= 1.0, ornMin= 1.0, grnMin= 1.0;
-		if(blobs.GetNumBlobs() > 3){
-			for(int i  = 0; i< 4; i++){
-				blobs.GetNthBlob( CBlobGetArea(), i, blob[i] );
-				double t;
-				if((t=colorDist(sumBlob(thresholded,blob[i]),R_GRN))<grnMin){
-					color_index[1] = i;
-					grnMin = t;
-				}
-				if((t=colorDist(sumBlob(thresholded,blob[i]),R_BLU))<bluMin){
-					color_index[0] = i;
-					bluMin = t;
-				}
-			}
-			if(color_index[0] == color_index[1])//blue and green match blobs
-				continue;//tryagain
-			int left[2];
-			int k = 0;
-			for(int i= 0; i< 4; i++)
-				if((color_index[0] != i) && (color_index[1] != i))
-					left[k++] = i;
-			
-			if(colorDist(sumBlob(thresholded,blob[left[0]]),R_ORN)<colorDist(sumBlob(thresholded,blob[left[1]]),R_ORN)){
-				color_index[3] = left[0];
-				color_index[2] = left[1];
-			}else{
-				color_index[3] = left[1];
-				color_index[2] = left[0];
-			}
-			CvScalar colors[4] = {BLU,GRN,RED,ORN};
-			for(int i = 0; i < 4; i++){
-				rectBlob(thresholded,blob[color_index[i]],colors[i]);
-			}
-			
-			
-			CvPoint2D32f imgPoints[NUM_LEDS];
-			for(int i = 0; i < NUM_LEDS; i++){
-				imgPoints[i] = cvPoint2D32f(blob[color_index[i]].sumx,blob[color_index[i]].sumy);
-				cout << "imgPoint " << i << ": " << imgPoints[i].x << ", " << imgPoints[i].y << endl;
-			}
-			
-			
-			cvPOSIT(posObj,imgPoints,focal_length,cvTermCriteria(1,10,.05),
-					rotation_matrix,translation_vector);
-			cout << "rotation_matrix" << endl;
-			for(int i=0;i<3;i++){
-				for(int j=0;j<3;j++){
-					cout << rotation_matrix[i*3+j] << "\t";
-				}
-				cout << endl;
-			}
-			cout <<  "translation_vector" << endl;
-			for(int j=0;j<3;j++){
-				cout << translation_vector[j] << endl;
-			}
-			
-		}
-		cvShowImage(THR, thresholded);
-		cvShowImage(DEV, videoFrame);
-		int k = cvWaitKey(0);
-		if(k == ESC || k == 'q')
-			break;
-		
-		
-		
-    }while(videoFrame = cvQueryFrame(vid));
+	
+	/** Initialize openGL window **/
+	glutInitWindowSize(320, 200);
+	glutInit(&argc, argv);
+	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);
+	glutCreateWindow("head");
+	
+	glutKeyboardFunc(keyboard);
+	glutDisplayFunc(display); 
+	glutVisibilityFunc(visible);
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	
+	glFrustum(-.9, .9, -.9, .9, 1.0, 35.0);
+	
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+	glEnable(GL_NORMALIZE);
+	glEnable(GL_CULL_FACE);
+	glCullFace(GL_BACK);
+	glShadeModel(GL_SMOOTH);
+	glDepthFunc(GL_LESS);
+	glDepthMask(GL_TRUE);
+	glEnable(GL_DEPTH_TEST);
+	
+	glutMainLoop();	
+	
+	
+
     
     
     return 0;
