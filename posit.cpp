@@ -21,21 +21,21 @@ using namespace std;
 #define NUM_LEDS 4
 
 #define BLU CV_RGB(0,0,255)
-#define RED CV_RGB(255,0,0)
-#define GRN CV_RGB(0,255,0)
-#define ORN CV_RGB(143,89,26)
-/*
-#define R_BLU CV_RGB(0,0,1)
-#define R_RED CV_RGB(1,0,0)
-#define R_GRN CV_RGB(0,1,0)
-#define R_ORN CV_RGB(140.0/255.0,115.0/255.0,0.0)
-#define NUM_LEDS 4
-*/
+#define RED CV_RGB(255, 191, 191)
+#define GRN CV_RGB(175,159,43)
+#define ORN CV_RGB(191,64,191)
+
+//#define R_BLU CV_RGB(0,0,1)
+//#define R_RED CV_RGB(1,0,0)
+//#define R_GRN CV_RGB(0,1,0)
+//#define R_ORN CV_RGB(140.0/255.0,115.0/255.0,0.0)
+//#define NUM_LEDS 4
+
 CvScalar normRGB(CvScalar color){
     double dist = sqrt(color.val[0]*color.val[0]+color.val[1]*color.val[1]+color.val[2]*color.val[2]);
     CvScalar result = color;
     for(int i = 0; i < 3; i++)
-	result.val[i] = result.val[i]/dist;
+		result.val[i] = result.val[i]/dist;
     return result;
 }
 
@@ -65,6 +65,12 @@ double focal_length;
 CvMatr32f rotation_matrix;
 CvVect32f translation_vector;
 
+CvMatr32f rotation_matrix_opt1;
+CvMatr32f rotation_matrix_opt2;
+CvVect32f translation_vector_opt1;
+CvVect32f translation_vector_opt2;
+
+
 CvScalar sumBlob(IplImage * img, CBlob blob){
 	//unsigned int a ing->imageData    y*img->widthStep+x
     CvScalar result, temp;
@@ -76,20 +82,22 @@ CvScalar sumBlob(IplImage * img, CBlob blob){
     for(int x = (int)blob.minx;x<(int)blob.maxx;x++){
 		for(int y = (int)blob.miny;y<(int)blob.maxy;y++){
 			temp = cvGet2D(img,y,x);
-			for(int i = 0; i < 4; i++){
-				result.val[i] += temp.val[i];
+			bool isBlack = false;
+			bool isWhite = false;
+			if (temp.val[0] == 0 && temp.val[1] == 0 && temp.val[2] == 0) {
+				isBlack = true;
+			}
+			if (temp.val[0] > 250 && temp.val[1] > 250 && temp.val[2] > 250) {
+				isWhite = true;
+			}
+			if (!isBlack && !isWhite) {
+				for(int i = 0; i < 4; i++){
+					result.val[i] += temp.val[i];
+				}
 			}
 		}
     }
-	
-    /*    double scale = result.val[1]+result.val[0]+result.val[2];
-    result.val[0] = result.val[0]/scale;
-    result.val[1] = result.val[1]/scale;
-    result.val[2] = result.val[2]/scale;*/
-    /*    for(int i = 0;i<3; i++)
-	 cout << result.val[i] << " " ;
-	 cout << endl;*/
-    return normRGB(result);
+	return normRGB(result);
 }
 
 double colorDist(CvScalar c1, CvScalar ratio){
@@ -103,6 +111,42 @@ double colorDist(CvScalar c1, CvScalar ratio){
     result = sqrt(result);	
     //    cout << result << "r ";
     return result;
+}
+
+double colorDist2(CvScalar c1, CvScalar c2) {
+	CvScalar norm1 = normRGB(c1);
+	CvScalar norm2 = normRGB(c2);
+	double result = 0;
+	for (int i = 0; i < 3; i++) {
+		double diff = norm1.val[i] - norm2.val[i];
+		if (diff < 0)
+			diff = -diff;
+		result += diff;
+	}
+	return result;
+}
+
+void otherLEDMatch(CvScalar colors[NUM_LEDS], CvScalar leds[NUM_LEDS], int * match_index) {
+	bool taken[4];
+	for (int i = 0; i < 3; i++) {
+		taken[i] = false;
+	}
+	
+	for (int i = 0; i < NUM_LEDS; i++) {
+		double lowestCost = 100000;
+		int matchForI = 0;
+		for (int j = 0; j < NUM_LEDS; j++) {
+			//if (taken[j])
+			//	continue;
+			double dist = colorDist2(colors[i], leds[j]);
+			if (dist < lowestCost) {
+				lowestCost = dist;
+				matchForI = j;
+			}
+		}
+		match_index[i] = matchForI;
+		taken[matchForI] = true;
+	}
 }
 
 //colors always go in this order: blue green red orange
@@ -192,9 +236,7 @@ void idle(void)
 
 	if(blobs.GetNumBlobs() >= NUM_LEDS){
 	    optimalLEDMatch(colors,blobColors,color_index);
-	    for(int i = 0; i < 4; i++){
-		rectBlob(thresholded,blob[color_index[i]],colors[i]);
-	    }
+
 			
 			
 	    CvPoint2D32f imgPoints[NUM_LEDS];
@@ -204,8 +246,76 @@ void idle(void)
 	    }
 			
 			
-	    cvPOSIT(posObj,imgPoints,focal_length,cvTermCriteria(1,10,.05),
-		    rotation_matrix,translation_vector);
+	    cvPOSIT(posObj,imgPoints,focal_length,cvTermCriteria(1,10,.05), rotation_matrix_opt1,translation_vector_opt1);
+		CvPoint2D32f tmp = imgPoints[2];
+		imgPoints[2] = imgPoints[3];
+		imgPoints[3] = tmp;
+		cvPOSIT(posObj,imgPoints,focal_length,cvTermCriteria(1,10,.05), rotation_matrix_opt2, translation_vector_opt2);
+		
+		
+		float unit_vector[3];
+		CvMat unit_vector_m = cvMat(3, 1, CV_32F, unit_vector);
+		unit_vector[0] = 0;
+		unit_vector[1] = 0;
+		unit_vector[2] = 1;
+		float rotated_old[3];
+		float rotated_opt1[3];
+		float rotated_opt2[3];
+		float dot_opt1 = 0;
+		float dot_opt2 = 0;
+		CvMat rotated_old_m = cvMat(3, 1, CV_32F, rotated_old);
+		CvMat rotated_opt1_m = cvMat(3, 1, CV_32F, rotated_opt1);
+		CvMat rotated_opt2_m = cvMat(3, 1, CV_32F, rotated_opt2);
+
+		CvMat rotation_matrix_m = cvMat(3, 3, CV_32F, rotation_matrix);
+		CvMat rotation_matrix_opt1_m = cvMat(3, 3, CV_32F, rotation_matrix_opt1);
+		CvMat rotation_matrix_opt2_m = cvMat(3, 3, CV_32F, rotation_matrix_opt2);
+		
+		cvMatMul(&rotation_matrix_m, &unit_vector_m, &rotated_old_m);
+		cvMatMul(&rotation_matrix_opt1_m, &unit_vector_m, &rotated_opt1_m);
+		cvMatMul(&rotation_matrix_opt2_m, &unit_vector_m, &rotated_opt2_m);
+		
+		dot_opt1 = rotated_old[0] * rotated_opt1[0] + rotated_old[1] * rotated_opt1[1] + rotated_old[2] * rotated_opt1[2];
+		dot_opt2 = rotated_old[0] * rotated_opt2[0] + rotated_old[1] * rotated_opt2[1] + rotated_old[2] * rotated_opt2[2];
+		cout << "dot 1 = " << dot_opt1 << ", dot 2 = " << dot_opt2 << endl;
+		if (dot_opt1 < 0)
+			dot_opt1 = -dot_opt1;
+		if (dot_opt1 > 1)
+			dot_opt1 = 1;
+		if (dot_opt2 < 0)
+			dot_opt2 = -dot_opt2;
+		if (dot_opt2 > 1)
+			dot_opt2 = 1;
+		float theta_opt1 = acos(dot_opt1);
+		float theta_opt2 = acos(dot_opt2);
+		cout << "theta 1 = " << theta_opt1 << ", theta 2 = " << theta_opt2 << endl;
+		if (theta_opt1 <= theta_opt2) {
+			cout << "picking theta1" << endl;
+			for (int i = 0; i < 9; i++) {
+				rotation_matrix[i] = rotation_matrix_opt1[i];
+			}
+			for (int i = 0; i < 3; i++) {
+				translation_vector[i] = translation_vector_opt1[i];
+			}
+			
+		} else {
+			cout << "picking theta2" << endl;
+			for (int i = 0; i < 9; i++) {
+				rotation_matrix[i] = rotation_matrix_opt2[i];
+			}
+			for (int i = 0; i < 3; i++) {
+				translation_vector[i] = translation_vector_opt2[i];
+			}
+			int tmp = color_index[2];
+			color_index[2] = color_index[3];
+			color_index[3] = tmp;
+		}
+		for(int i = 0; i < 4; i++){
+			rectBlob(thresholded,blob[color_index[i]],colors[i]);
+	    }
+		// rotation =, translation =
+		
+		
 	    cout << "rotation_matrix" << endl;
 	    for(int i=0;i<3;i++){
 		for(int j=0;j<3;j++){
@@ -307,7 +417,8 @@ void display(void)
 	//	glLightfv(GL_LIGHT1, GL_POSITION, light1Pos);
 	//	glPopMatrix();
 	
-	glScalef(8.0, 8.0, 8.0);
+	glScalef(1, -1, 1);
+	glScalef(12.0, 12.0, 12.0);
 	glRotatef(180, 0.0, 1.0, 0.0);
 	
 	GLfloat transform[16];
@@ -329,10 +440,9 @@ void display(void)
 	transform[15] = 1;
 	
 	glMultMatrixf(transform);
-
-
-
-
+	glRotatef(180, 0, 1, 0);
+	glScalef(1, 1, 1);
+	
 	
 	const GLfloat			lightAmbient[] = {0.2, 0.2, 0.2, 1.0};
 	const GLfloat			lightDiffuse[] = {1.0, 1.0, 1.0, 1.0};
@@ -445,10 +555,14 @@ int main(int argc, char * argv[]){
     rotation_matrix = new float[9];
     translation_vector = new float[3];
 	
+	rotation_matrix_opt1 = new float[9];
+	rotation_matrix_opt2 = new float[9];
+	translation_vector_opt1 = new float[3];
+	translation_vector_opt2 = new float[2];
 	
 	
 	/** Initialize openGL window **/
-	glutInitWindowSize(320, 200);
+	glutInitWindowSize(640, 480);
 	glutInit(&argc, argv);
 	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);
 	glutCreateWindow("head");
@@ -459,7 +573,7 @@ int main(int argc, char * argv[]){
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
 	
-	glFrustum(-.9, .9, -.9, .9, 1.0, 35.0);
+	glFrustum(-.9, .9, -0.9f*(640.0f/480.0f), 0.9f*(640.0f/480.0f), 1.0, 50.0);
 	
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
