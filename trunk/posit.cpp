@@ -21,9 +21,9 @@ using namespace std;
 #define NUM_LEDS 4
 
 #define BLU CV_RGB(0,0,255)
-#define RED CV_RGB(207,48,143)
-#define GRN CV_RGB(0,255,64)
-#define ORN CV_RGB(255,255,255)
+#define RED CV_RGB(255,0,0)
+#define GRN CV_RGB(0,255,0)
+#define ORN CV_RGB(143,89,26)
 /*
 #define R_BLU CV_RGB(0,0,1)
 #define R_RED CV_RGB(1,0,0)
@@ -100,9 +100,53 @@ double colorDist(CvScalar c1, CvScalar ratio){
 		double t = ((norm.val[i]) - ratio.val[i]);
 		result += t*t;
     }
-    return sqrt(result);	
+    result = sqrt(result);	
+    cout << result << "r ";
+    return result;
 }
 
+//colors always go in this order: blue green red orange
+// match_index: which color goes to which blob, so the blue blob is 
+// match_index[0]
+double optimalLEDMatch(CvScalar colors[NUM_LEDS], CvScalar leds[NUM_LEDS], 
+		       int match_index[NUM_LEDS])
+{
+  double result = 50000.0;
+  
+  for(int i = 0; i< NUM_LEDS; i++){
+    double test = colorDist(leds[i],colors[0]);
+    if(test > result)
+      continue;
+    for(int j = 0; j < NUM_LEDS; j++){
+      if(j == i) continue;
+      test += colorDist(leds[j],colors[1]);
+      if(test > result)
+	continue;
+      for(int k = 0; k < NUM_LEDS; k++){
+	if(k == j || k == i) continue;
+	test += colorDist(leds[k],colors[2]);
+	if(test > result)
+	  continue;
+	for(int m = 0; m < NUM_LEDS; m++){
+	  if(m == j || m == k || m == i) continue;
+	  test += colorDist(leds[m],colors[3]);
+	  if(test < result){
+	    result = test;
+	    match_index[0] = i;
+	    match_index[1] = j;
+	    match_index[2] = k;
+	    match_index[3] = m;
+	  }	  
+	}
+      }
+    }
+  }
+  cout << "colors";
+  for(int i = 0; i < NUM_LEDS; i++)
+    cout << match_index[i] << " ";
+  cout << result << endl;
+  return result;
+}
 
 void rectBlob(IplImage * img, CBlob blob, CvScalar color){
 	CvScalar brightc = color;
@@ -135,78 +179,49 @@ void idle(void)
 	blobs.Filter( blobs, B_INCLUDE, CBlobGetPerimeter(), B_LESS, 1000 );
 	blobs.Filter( blobs, B_INCLUDE, CBlobGetPerimeter(), B_GREATER, 15 );
 	// get the blob with less area
-	CBlob blob[4];
-	int color_index[4]; //blue green red orange
-	for(int i = 0; i<4;i++)
-		color_index[i]= 0;
-	double bluMin= 1.0, ornMin= 1.0, grnMin= 1.0;
-	if(blobs.GetNumBlobs() > 3){
-		for(int i  = 0; i< 4; i++){
-			blobs.GetNthBlob( CBlobGetArea(), i, blob[i] );
-			double t;
-			if((t=colorDist(sumBlob(thresholded,blob[i]),R_GRN))<grnMin){
-				color_index[1] = i;
-				grnMin = t;
-			}
-			if((t=colorDist(sumBlob(thresholded,blob[i]),R_BLU))<bluMin){
-				color_index[0] = i;
-				bluMin = t;
-			}
-		}
-		if(color_index[0] == color_index[1])//blue and green match blobs
-		{
-			//continue;//tryagain
-			cvWaitKey(0);
-			videoFrame = cvQueryFrame(vid);
-			glutPostRedisplay();
-			return;
-		}
-		int left[2];
-		int k = 0;
-		for(int i= 0; i< 4; i++)
-			if((color_index[0] != i) && (color_index[1] != i))
-				left[k++] = i;
-		
-		if(colorDist(sumBlob(thresholded,blob[left[0]]),R_ORN)<colorDist(sumBlob(thresholded,blob[left[1]]),R_ORN)){
-			color_index[3] = left[0];
-			color_index[2] = left[1];
-		}else{
-			color_index[3] = left[1];
-			color_index[2] = left[0];
-		}
-		CvScalar colors[4] = {BLU,GRN,RED,ORN};
-		for(int i = 0; i < 4; i++){
-			rectBlob(thresholded,blob[color_index[i]],colors[i]);
-		}
-		
-		
-		CvPoint2D32f imgPoints[NUM_LEDS];
-		for(int i = 0; i < NUM_LEDS; i++){
-			imgPoints[i] = cvPoint2D32f(blob[color_index[i]].sumx,blob[color_index[i]].sumy);
-			cout << "imgPoint " << i << ": " << imgPoints[i].x << ", " << imgPoints[i].y << endl;
-		}
-		
-		
-		cvPOSIT(posObj,imgPoints,focal_length,cvTermCriteria(CV_TERMCRIT_ITER, 5, 1.0e-5 ),
-				rotation_matrix,translation_vector);
-		cout << "rotation_matrix" << endl;
-		for(int i=0;i<3;i++){
-			for(int j=0;j<3;j++){
-				cout << rotation_matrix[i*3+j] << "\t";
-			}
-			cout << endl;
-		}
-		cout <<  "translation_vector" << endl;
+	CBlob blob[NUM_LEDS];
+	CvScalar blobColors[NUM_LEDS];
+	for(int i  = 0; i< NUM_LEDS; i++){
+	    blobs.GetNthBlob( CBlobGetArea(), i, blob[i] );
+	    blobColors[i] = sumBlob(thresholded,blob[i]);
+	}
+	int color_index[NUM_LEDS]; //blue green red orange
+	CvScalar colors[NUM_LEDS] = {R_BLU,R_GRN,R_RED,R_ORN};
+
+	if(blobs.GetNumBlobs() >= NUM_LEDS){
+	    optimalLEDMatch(colors,blobColors,color_index);
+	    for(int i = 0; i < 4; i++){
+		rectBlob(thresholded,blob[color_index[i]],colors[i]);
+	    }
+			
+			
+	    CvPoint2D32f imgPoints[NUM_LEDS];
+	    for(int i = 0; i < NUM_LEDS; i++){
+		imgPoints[i] = cvPoint2D32f(blob[color_index[i]].sumx,blob[color_index[i]].sumy);
+		cout << "imgPoint " << i << ": " << imgPoints[i].x << ", " << imgPoints[i].y << endl;
+	    }
+			
+			
+	    cvPOSIT(posObj,imgPoints,focal_length,cvTermCriteria(1,10,.05),
+		    rotation_matrix,translation_vector);
+	    cout << "rotation_matrix" << endl;
+	    for(int i=0;i<3;i++){
 		for(int j=0;j<3;j++){
-			cout << translation_vector[j] << endl;
+		    cout << rotation_matrix[i*3+j] << "\t";
 		}
-		
+		cout << endl;
+	    }
+	    cout <<  "translation_vector" << endl;
+	    for(int j=0;j<3;j++){
+		cout << translation_vector[j] << endl;
+	    }
+			
 	}
 	cvShowImage(THR, thresholded);
-	cvShowImage(DEV, videoFrame);
+	//	cvShowImage(DEV, videoFrame);
 	int k = cvWaitKey(0);
-	if (k == ESC)
-		exit(0);
+	if(k == 'q' || k == ESC)
+	  abort();
 	videoFrame = cvQueryFrame(vid);
 	glutPostRedisplay();
 }
@@ -278,10 +293,8 @@ void display(void)
 	//	}
 	
 	//else{
-	glTranslatef(0.0, 0.0 , -20);
+	glTranslatef(0.0, 0.0 , -8.42);
 	//}
-	
-	
 	
 	
 	
@@ -291,29 +304,8 @@ void display(void)
 	//	glPushMatrix();
 	//	glLightfv(GL_LIGHT1, GL_POSITION, light1Pos);
 	//	glPopMatrix();
-
+	
 	glScalef(8.0, 8.0, 8.0);
-	glRotatef(180, 0, 1, 0);
-	
-	GLfloat transform[16];
-	transform[0] = rotation_matrix[0];
-	transform[1] = rotation_matrix[3];
-	transform[2] = rotation_matrix[6];
-	transform[3] = 0;
-	transform[4] = rotation_matrix[1];
-	transform[5] = rotation_matrix[4];
-	transform[6] = rotation_matrix[7];
-	transform[7] = 0;
-	transform[8] = rotation_matrix[2];
-	transform[9] = rotation_matrix[5];
-	transform[10] = rotation_matrix[8];
-	transform[11] = 0;
-	transform[12] = translation_vector[0];
-	transform[13] = translation_vector[1];
-	transform[14] = translation_vector[2];
-	transform[15] = 1;
-	
-	glMultMatrixf(transform);
 	
 	const GLfloat			lightAmbient[] = {0.2, 0.2, 0.2, 1.0};
 	const GLfloat			lightDiffuse[] = {1.0, 1.0, 1.0, 1.0};
