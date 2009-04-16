@@ -15,17 +15,31 @@ using namespace std;
 #define DEV "development"
 #define THR "thresholded"
 #define WAIT 1
+#define NUM_LEDS 4
 
 #define BLU CV_RGB(0,0,255)
 #define RED CV_RGB(255,0,0)
 #define GRN CV_RGB(0,255,0)
 #define ORN CV_RGB(143,89,26)
+/*
 #define R_BLU CV_RGB(0,0,1)
 #define R_RED CV_RGB(1,0,0)
 #define R_GRN CV_RGB(0,1,0)
-#define R_ORN CV_RGB(140.0/255.0,115.0/255.0,0.0/*26.0/255.0*/)
+#define R_ORN CV_RGB(140.0/255.0,115.0/255.0,0.0)
 #define NUM_LEDS 4
+*/
+CvScalar normRGB(CvScalar color){
+    double dist = sqrt(color.val[0]*color.val[0]+color.val[1]*color.val[1]+color.val[2]*color.val[2]);
+    CvScalar result = color;
+    for(int i = 0; i < 3; i++)
+	result.val[i] = result.val[i]/dist;
+    return result;
+}
 
+CvScalar R_BLU = normRGB(BLU);
+CvScalar R_RED = normRGB(RED);
+CvScalar R_ORN = normRGB(ORN);
+CvScalar R_GRN = normRGB(GRN);
 
 void printMat(CvMat * mat){
     cout << "[";
@@ -73,12 +87,14 @@ CvScalar sumBlob(IplImage * img, CBlob blob){
 double myabs(double v){ return (v<0.0)?-1*v:v;}
 
 double colorDist(CvScalar c1, CvScalar ratio){
-	double result = 0.0;
-	double sumc1 = c1.val[0] + c1.val[1] + c1.val[2];
-	for(int i = 0; i < 3; i++)
-		result += myabs((c1.val[i]/sumc1) - ratio.val[i]);
-	return result;
-	
+    CvScalar norm = normRGB(c1);
+    double result = 0.0;
+//    double sumc1 = c1.val[0] + c1.val[1] + c1.val[2];
+    for(int i = 0; i < 3; i++){
+	double t = ((norm.val[i]) - ratio.val[i]);
+	result += t*t;
+    }
+    return sqrt(result);	
 }
 
 
