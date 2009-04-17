@@ -21,9 +21,9 @@ using namespace std;
 #define NUM_LEDS 4
 
 #define BLU CV_RGB(0,0,255)
-#define RED CV_RGB(255, 191, 191)
-#define GRN CV_RGB(175,159,43)
-#define ORN CV_RGB(191,64,191)
+#define RED CV_RGB(142, 16, 79)
+#define GRN CV_RGB(31,207,0)
+#define ORN CV_RGB(191,64,64)
 
 //#define R_BLU CV_RGB(0,0,1)
 //#define R_RED CV_RGB(1,0,0)
@@ -214,7 +214,7 @@ void idle(void)
 {
 	cvThreshold( videoFrame, thresholded, 250, 1, CV_THRESH_TOZERO );
 	cvDilate(thresholded,thresholded,element);
-	cvSmooth(thresholded,thresholded);
+	//cvSmooth(thresholded,thresholded);
 	cvCvtColor(thresholded, greythresh, CV_BGR2GRAY);
 	CBlobResult blobs;
 	// Extract the blobs using a threshold of 100 in the image
@@ -235,8 +235,36 @@ void idle(void)
 	CvScalar colors[NUM_LEDS] = {R_BLU,R_GRN,R_RED,R_ORN};
 
 	if(blobs.GetNumBlobs() >= NUM_LEDS){
-	    optimalLEDMatch(colors,blobColors,color_index);
-
+	    
+		bool alreadyPicked[NUM_LEDS];
+		for (int i = 0; i < NUM_LEDS; i++) {
+			alreadyPicked[i] = false;
+		}
+		
+		// find leftmost led (red)
+		
+			 
+		// find rightmost led (blue)
+		
+		// find top led (orange)
+		
+		// find bottom led (green)
+		
+		
+		
+		optimalLEDMatch(colors,blobColors,color_index);
+		
+		if (blob[color_index[2]].sumx > blob[color_index[3]].sumx){
+			int tmp = color_index[2];
+			color_index[2] = color_index[3];
+			color_index[3] = tmp;
+		}
+		
+		if (blob[color_index[1]].sumy < blob[color_index[3]].sumy) {
+			int tmp = color_index[1];
+			color_index[1] = color_index[3];
+			color_index[3] = tmp;
+		}
 			
 			
 	    CvPoint2D32f imgPoints[NUM_LEDS];
@@ -288,8 +316,12 @@ void idle(void)
 			dot_opt2 = 1;
 		float theta_opt1 = acos(dot_opt1);
 		float theta_opt2 = acos(dot_opt2);
+		if (theta_opt1 < 0)
+			theta_opt1 = -theta_opt1;
+		if (theta_opt2 < 0)
+			theta_opt2 = -theta_opt2;
 		cout << "theta 1 = " << theta_opt1 << ", theta 2 = " << theta_opt2 << endl;
-		if (theta_opt1 <= theta_opt2) {
+		if (/*theta_opt1 <= theta_opt2*/ true) {
 			cout << "picking theta1" << endl;
 			for (int i = 0; i < 9; i++) {
 				rotation_matrix[i] = rotation_matrix_opt1[i];
@@ -418,7 +450,7 @@ void display(void)
 	//	glPopMatrix();
 	
 	glScalef(1, -1, 1);
-	glScalef(12.0, 12.0, 12.0);
+	glScalef(40.0, 40.0, 40.0);
 	glRotatef(180, 0.0, 1.0, 0.0);
 	
 	GLfloat transform[16];
@@ -441,7 +473,7 @@ void display(void)
 	
 	glMultMatrixf(transform);
 	glRotatef(180, 0, 1, 0);
-	glScalef(1, 1, 1);
+	glScalef(.5, -.5, .5);
 	
 	
 	const GLfloat			lightAmbient[] = {0.2, 0.2, 0.2, 1.0};
@@ -573,7 +605,7 @@ int main(int argc, char * argv[]){
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
 	
-	glFrustum(-.9, .9, -0.9f*(640.0f/480.0f), 0.9f*(640.0f/480.0f), 1.0, 50.0);
+	glFrustum(-.9, .9, -0.9f*(640.0f/480.0f), 0.9f*(640.0f/480.0f), 1.0, 100.0);
 	
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
