@@ -25,12 +25,6 @@ using namespace std;
 #define GRN CV_RGB(31,207,0)
 #define ORN CV_RGB(191,64,64)
 
-//#define R_BLU CV_RGB(0,0,1)
-//#define R_RED CV_RGB(1,0,0)
-//#define R_GRN CV_RGB(0,1,0)
-//#define R_ORN CV_RGB(140.0/255.0,115.0/255.0,0.0)
-//#define NUM_LEDS 4
-
 CvScalar normRGB(CvScalar color){
     double dist = sqrt(color.val[0]*color.val[0]+color.val[1]*color.val[1]+color.val[2]*color.val[2]);
     CvScalar result = color;
@@ -233,6 +227,8 @@ void idle(void)
 	}
 	int color_index[NUM_LEDS]; //blue green red orange
 	CvScalar colors[NUM_LEDS] = {R_BLU,R_GRN,R_RED,R_ORN};
+	CvScalar vibColors[NUM_LEDS] = {CV_RGB(0,0,255),CV_RGB(0,255,0),
+					CV_RGB(255,0,0),CV_RGB(255,255,0)};
 
 	if(blobs.GetNumBlobs() >= NUM_LEDS){
 	    
@@ -240,33 +236,63 @@ void idle(void)
 		for (int i = 0; i < NUM_LEDS; i++) {
 			alreadyPicked[i] = false;
 		}
-		
+		//optimalLEDMatch(colors,blobColors,color_index);		
 		// find leftmost led (red)
-		
-			 
+		double temp = blob[0].sumx; 
+		int ti = 0;
+		for(int i = 1; i < NUM_LEDS; i++){
+		  if(blob[i].sumx < temp){
+		    ti = i;
+		    temp = blob[i].sumx;
+		  }
+		}
+		color_index[2] = ti;
+		alreadyPicked[ti] = true;
 		// find rightmost led (blue)
-		
+		temp = blob[0].sumx; 
+		ti = 0;
+		for(int i = 1; i < NUM_LEDS; i++){
+		  if(!alreadyPicked[i] && (blob[i].sumx > temp)){
+		    ti = i;
+		    temp = blob[i].sumx;
+		  }
+		}
+		color_index[0] = ti;
+		alreadyPicked[ti] = true;
 		// find top led (orange)
-		
+		temp = 2000; 
+		ti = 0;
+		for(int i = 0; i < NUM_LEDS; i++){
+		  if(!alreadyPicked[i] && (blob[i].sumy < temp)){
+		    ti = i;
+		    temp = blob[i].sumx;
+		  }
+		}
+		color_index[3] = ti;
+		alreadyPicked[ti] = true;
 		// find bottom led (green)
+		ti = 0;
+		for(int i = 0; i < NUM_LEDS; i++){
+		  if(!alreadyPicked[i]){
+		    ti = i;
+		  }
+		}
+		color_index[1] = ti;
 		
 		
-		
-		optimalLEDMatch(colors,blobColors,color_index);
-		
+
+		/*		
 		if (blob[color_index[2]].sumx > blob[color_index[3]].sumx){
 			int tmp = color_index[2];
 			color_index[2] = color_index[3];
 			color_index[3] = tmp;
 		}
-		
 		if (blob[color_index[1]].sumy < blob[color_index[3]].sumy) {
 			int tmp = color_index[1];
 			color_index[1] = color_index[3];
 			color_index[3] = tmp;
 		}
-			
-			
+		*/
 	    CvPoint2D32f imgPoints[NUM_LEDS];
 	    for(int i = 0; i < NUM_LEDS; i++){
 		imgPoints[i] = cvPoint2D32f(blob[color_index[i]].sumx,blob[color_index[i]].sumy);
