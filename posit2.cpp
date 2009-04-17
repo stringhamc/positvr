@@ -10,7 +10,7 @@
 #include "BlobResult.h"
 #include <math.h>
 #include <GLUT/glut.h>
-#include "skull.h"
+#include "box.h"
 
 //#include "Blob.h"
 using namespace std;
@@ -24,6 +24,12 @@ using namespace std;
 #define RED CV_RGB(142, 16, 79)
 #define GRN CV_RGB(31,207,0)
 #define ORN CV_RGB(191,64,64)
+
+//#define R_BLU CV_RGB(0,0,1)
+//#define R_RED CV_RGB(1,0,0)
+//#define R_GRN CV_RGB(0,1,0)
+//#define R_ORN CV_RGB(140.0/255.0,115.0/255.0,0.0)
+//#define NUM_LEDS 4
 
 CvScalar normRGB(CvScalar color){
     double dist = sqrt(color.val[0]*color.val[0]+color.val[1]*color.val[1]+color.val[2]*color.val[2]);
@@ -228,8 +234,8 @@ void idle(void)
 	int color_index[NUM_LEDS]; //blue green red orange
 	CvScalar colors[NUM_LEDS] = {R_BLU,R_GRN,R_RED,R_ORN};
 	CvScalar vibColors[NUM_LEDS] = {CV_RGB(0,0,255),CV_RGB(0,255,0),
-					CV_RGB(255,0,0),CV_RGB(255,255,0)};
-
+	CV_RGB(255,0,0),CV_RGB(255,255,0)};
+	
 	if(blobs.GetNumBlobs() >= NUM_LEDS){
 	    
 		bool alreadyPicked[NUM_LEDS];
@@ -241,10 +247,10 @@ void idle(void)
 		double temp = blob[0].sumx; 
 		int ti = 0;
 		for(int i = 1; i < NUM_LEDS; i++){
-		  if(blob[i].sumx < temp){
-		    ti = i;
-		    temp = blob[i].sumx;
-		  }
+			if(blob[i].sumx < temp){
+				ti = i;
+				temp = blob[i].sumx;
+			}
 		}
 		color_index[2] = ti;
 		alreadyPicked[ti] = true;
@@ -252,10 +258,10 @@ void idle(void)
 		temp = blob[0].sumx; 
 		ti = 0;
 		for(int i = 1; i < NUM_LEDS; i++){
-		  if(!alreadyPicked[i] && (blob[i].sumx > temp)){
-		    ti = i;
-		    temp = blob[i].sumx;
-		  }
+			if(!alreadyPicked[i] && (blob[i].sumx > temp)){
+				ti = i;
+				temp = blob[i].sumx;
+			}
 		}
 		color_index[0] = ti;
 		alreadyPicked[ti] = true;
@@ -263,43 +269,43 @@ void idle(void)
 		temp = 2000; 
 		ti = 0;
 		for(int i = 0; i < NUM_LEDS; i++){
-		  if(!alreadyPicked[i] && (blob[i].sumy < temp)){
-		    ti = i;
-		    temp = blob[i].sumy;
-		  }
+			if(!alreadyPicked[i] && (blob[i].sumy < temp)){
+				ti = i;
+				temp = blob[i].sumy;
+			}
 		}
 		color_index[3] = ti;
 		alreadyPicked[ti] = true;
 		// find bottom led (green)
 		ti = 0;
 		for(int i = 0; i < NUM_LEDS; i++){
-		  if(!alreadyPicked[i]){
-		    ti = i;
-		  }
+			if(!alreadyPicked[i]){
+				ti = i;
+			}
 		}
 		color_index[1] = ti;
 		
 		
-
+		
 		/*		
-		if (blob[color_index[2]].sumx > blob[color_index[3]].sumx){
-			int tmp = color_index[2];
-			color_index[2] = color_index[3];
-			color_index[3] = tmp;
-		}
-		if (blob[color_index[1]].sumy < blob[color_index[3]].sumy) {
-			int tmp = color_index[1];
-			color_index[1] = color_index[3];
-			color_index[3] = tmp;
-		}
-		*/
+		 if (blob[color_index[2]].sumx > blob[color_index[3]].sumx){
+		 int tmp = color_index[2];
+		 color_index[2] = color_index[3];
+		 color_index[3] = tmp;
+		 }
+		 if (blob[color_index[1]].sumy < blob[color_index[3]].sumy) {
+		 int tmp = color_index[1];
+		 color_index[1] = color_index[3];
+		 color_index[3] = tmp;
+		 }
+		 */
 	    CvPoint2D32f imgPoints[NUM_LEDS];
 	    for(int i = 0; i < NUM_LEDS; i++){
-		imgPoints[i] = cvPoint2D32f(blob[color_index[i]].sumx,blob[color_index[i]].sumy);
-		cout << "imgPoint " << i << ": " << imgPoints[i].x << ", " << imgPoints[i].y << endl;
+			imgPoints[i] = cvPoint2D32f(blob[color_index[i]].sumx,blob[color_index[i]].sumy);
+			cout << "imgPoint " << i << ": " << imgPoints[i].x << ", " << imgPoints[i].y << endl;
 	    }
-			
-			
+		
+		
 	    cvPOSIT(posObj,imgPoints,focal_length,cvTermCriteria(1,10,.05), rotation_matrix_opt1,translation_vector_opt1);
 		CvPoint2D32f tmp = imgPoints[2];
 		imgPoints[2] = imgPoints[3];
@@ -320,7 +326,7 @@ void idle(void)
 		CvMat rotated_old_m = cvMat(3, 1, CV_32F, rotated_old);
 		CvMat rotated_opt1_m = cvMat(3, 1, CV_32F, rotated_opt1);
 		CvMat rotated_opt2_m = cvMat(3, 1, CV_32F, rotated_opt2);
-
+		
 		CvMat rotation_matrix_m = cvMat(3, 3, CV_32F, rotation_matrix);
 		CvMat rotation_matrix_opt1_m = cvMat(3, 3, CV_32F, rotation_matrix_opt1);
 		CvMat rotation_matrix_opt2_m = cvMat(3, 3, CV_32F, rotation_matrix_opt2);
@@ -376,22 +382,22 @@ void idle(void)
 		
 	    cout << "rotation_matrix" << endl;
 	    for(int i=0;i<3;i++){
-		for(int j=0;j<3;j++){
-		    cout << rotation_matrix[i*3+j] << "\t";
-		}
-		cout << endl;
+			for(int j=0;j<3;j++){
+				cout << rotation_matrix[i*3+j] << "\t";
+			}
+			cout << endl;
 	    }
 	    cout <<  "translation_vector" << endl;
 	    for(int j=0;j<3;j++){
-		cout << translation_vector[j] << endl;
+			cout << translation_vector[j] << endl;
 	    }
-			
+		
 	}
 	cvShowImage(THR, thresholded);
 	//	cvShowImage(DEV, videoFrame);
 	int k = cvWaitKey(WAIT);
 	if(k == 'q' || k == ESC)
-	  exit(0);
+		exit(0);
 	videoFrame = cvQueryFrame(vid);
 	glutPostRedisplay();
 }
@@ -411,36 +417,32 @@ void display(void)
 {
 	unsigned int i;
 	glMatrixMode(GL_PROJECTION);
-	//glLoadIdentity();
-	GLfloat projection[16];
-	static GLfloat xp = .1;
-	static GLfloat yp = .1;
-	static GLfloat zp = -.07;
-	zp -= 0;
+	glLoadIdentity();
+	GLfloat size = .01 * tanf(45.0f*3.1415f/360.0f);
+	glFrustum(-size, size, -size, size, 0.01, 100);
+
+
+	GLfloat transform[16];
+	transform[0] = 1;
+	transform[1] = 0;
+	transform[2] = 0;
+	transform[3] = 0;
 	
-	//yp += .1;
-	//xp += .1;
-	projection[0] = 50;
-	projection[1] = 0;
-	projection[2] = 0;
-	projection[3] = 0;
+	transform[4] = 0;
+	transform[5] = 1;
+	transform[6] = 0;
+	transform[7] = 0;
 	
-	projection[4] = 0;
-	projection[5] = 50;
-	projection[6] = 0;
-	projection[7] = 0;
+	transform[8] = 0;
+	transform[9] = 0;
+	transform[10] = translation_vector[2];
+	transform[11] = 0;
+	transform[12] = -(translation_vector[0]-.9);
+	transform[13] = translation_vector[1]-.4;
+	transform[14] = 0;
+	transform[15] = 1;
 	
-	projection[8] = 0;
-	projection[9] = 0;
-	projection[10] = 1;
-	projection[11] = 0;
-	
-	projection[12] = 0;
-	projection[13] = 0;
-	projection[14] = 0;
-	projection[15] = 1;
-	
-	//glMultMatrixf(projection);
+	glMultMatrixf(transform);
 	
 	glMatrixMode(GL_MODELVIEW);
 	
@@ -463,7 +465,8 @@ void display(void)
 	//	}
 	
 	//else{
-	glTranslatef(60, 20 , -10);
+	
+	glTranslatef(0.0, 0.0 , -1);
 	//}
 	
 	
@@ -474,32 +477,6 @@ void display(void)
 	//	glPushMatrix();
 	//	glLightfv(GL_LIGHT1, GL_POSITION, light1Pos);
 	//	glPopMatrix();
-	
-	glScalef(1, -1, 1);
-	glScalef(30.0, 30.0, 30.0);
-	glRotatef(180, 0.0, 1.0, 0.0);
-	
-	GLfloat transform[16];
-	transform[0] = rotation_matrix[0];
-	transform[1] = rotation_matrix[3];
-	transform[2] = rotation_matrix[6];
-	transform[3] = 0;
-	transform[4] = rotation_matrix[1];
-	transform[5] = rotation_matrix[4];
-	transform[6] = rotation_matrix[7];
-	transform[7] = 0;
-	transform[8] = rotation_matrix[2];
-	transform[9] = rotation_matrix[5];
-	transform[10] = rotation_matrix[8];
-	transform[11] = 0;
-	transform[12] = translation_vector[0]*2.5;
-	transform[13] = translation_vector[1]*2.5;
-	transform[14] = translation_vector[2];
-	transform[15] = 1;
-	
-	glMultMatrixf(transform);
-	glRotatef(180, 0, 1, 0);
-	glScalef(1, -1, 1);
 	
 	
 	const GLfloat			lightAmbient[] = {0.2, 0.2, 0.2, 1.0};
@@ -521,17 +498,74 @@ void display(void)
 	glShadeModel(GL_SMOOTH);
 	
 	
-	glVertexPointer(3, GL_FLOAT, 0, skullVertices);
-	glNormalPointer(GL_FLOAT, 0, skullNormals);
-	glEnableClientState(GL_VERTEX_ARRAY);
-	glEnableClientState(GL_NORMAL_ARRAY);
 	glEnable(GL_COLOR_MATERIAL);
+	// back wall
 	glColor4f(1, 1, 1, 1);
-	for (i = 0; i < skullIndexCount/3; i++) {
-		glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_SHORT, &skullIndices[i * 3]);
-	}
-	glDisableClientState(GL_VERTEX_ARRAY);
-	glDisableClientState(GL_NORMAL_ARRAY);
+	glNormal3f(0, 0, -1);
+	glBegin(GL_QUADS);
+	glVertex3f(-.5, -.5, -1);
+	glVertex3f(.5, -.5, -1);
+	glVertex3f(.5, .5, -1);
+	glVertex3f(-.5, .5, -1);
+	glEnd();
+	
+	// left wall
+	glColor4f(1, 0, 0, 1);
+	glNormal3f(1, 0, 0);
+	glBegin(GL_QUADS);
+	glVertex3f(-.5, -.5, 0);
+	glVertex3f(-.5, -.5, -1);
+	glVertex3f(-.5, .5, -1);
+	glVertex3f(-.5, .5, 0);
+	glEnd();
+	
+	// right wall
+	glColor4f(0, 0, 1, 1);
+	glNormal3f(-1, 0, 0);
+	glBegin(GL_QUADS);
+	glVertex3f(.5, -.5, -1);
+	glVertex3f(.5, -.5, 0);
+	glVertex3f(.5, .5, 0);
+	glVertex3f(.5, .5, -1);
+	glEnd();
+	
+	// bottom wall
+	glColor4f(0, 1, 1, 1);
+	glNormal3f(0, 1, 0);
+	glBegin(GL_QUADS);
+	glVertex3f(-.5, -.5, 0);
+	glVertex3f(.5, -.5, 0);
+	glVertex3f(.5, -.5, -1);
+	glVertex3f(-.5, -.5, -1);
+	glEnd();
+	
+	// top wall
+	glColor4f(0, 1, 0, 1);
+	glNormal3f(0, -1, 0);
+	glBegin(GL_QUADS);
+	glVertex3f(-.5, .5, 0);
+	glVertex3f(-.5, .5, -1);
+	glVertex3f(.5, .5, -1);
+	glVertex3f(.5, .5, 0);
+	glEnd();
+	
+	
+	
+	
+//	glTranslatef(0, 0, 40);
+//	glVertexPointer(3, GL_FLOAT, 0, CubeVertices);
+//	glNormalPointer(GL_FLOAT, 0, CubeNormals);
+//	glEnableClientState(GL_VERTEX_ARRAY);
+//	glEnableClientState(GL_NORMAL_ARRAY);
+//	glEnable(GL_COLOR_MATERIAL);
+//	glColor4f(1, 1, 1, 1);
+//	for (i = 0; i < CubeIndexCount/3; i++) {
+//		glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_SHORT, &CubeIndices[i * 3]);
+//	}
+//	glDisableClientState(GL_VERTEX_ARRAY);
+//	glDisableClientState(GL_NORMAL_ARRAY);
+	
+	
 	
 	glutSwapBuffers();
 	
@@ -631,8 +665,10 @@ int main(int argc, char * argv[]){
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
 	
-	glFrustum(-.9, .9, -0.9f*(640.0f/480.0f), 0.9f*(640.0f/480.0f), 1.0, 100.0);
-	
+//	glFrustum(-.9, .9, -0.9f, 0.9f, 1.0, 40.0);
+	GLfloat size = .01 * tanf(45.0f*3.1415f/360.0f);
+	glFrustum(-size, size, -size, size, 0.01, 100);
+
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
 	glEnable(GL_NORMALIZE);
