@@ -1,0 +1,1 @@
+A virtual reality display using the POSIT algorithm to estimate head pose.
